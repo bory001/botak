@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>탁구 스코어보드 — 법무법인 감천</title>
+<!-- GitHub: bory001/botak → https://bory001.github.io/botak/ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Bebas+Neue&family=Oswald:wght@700&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<style>
+  :root {
+    --p1: #e63946;
+    --p2: #1d72b8;
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c26;
+    --border: #2a2a3a;
+    --text: #f0f0f5;
+    --muted: #6b6b88;
+    --gold: #f4c430;
+    --serve-glow: rgba(244,196,48,0.35);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    user-select: none;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .topbar-title {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 1.3rem;
+    letter-spacing: 2px;
+    color: var(--gold);
+  }
+  .topbar-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .format-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.75rem;
+    padding: 5px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .format-btn.active {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #000;
+    font-weight: 700;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #444;
+    transition: background .3s;
+  }
+  .status-dot.online { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+
+  /* ── PLAYER NAME INPUTS ── */
+  .names-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+  }
+  .name-cell {
+    padding: 10px 14px;
+    background: var(--surface);
+  }
+  .name-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--border);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 4px 0;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .name-cell:first-child .name-input { color: var(--p1); border-bottom-color: var(--p1); }
+  .name-cell:last-child  .name-input { color: var(--p2); border-bottom-color: var(--p2); }
+
+  /* ── SET SCORE ── */
+  .set-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 8px 20px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+  }
+  .set-score {
+    font-family: 'Oswald', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: center;
+  }
+  .set-score.p1 { color: var(--p1); }
+  .set-score.p2 { color: var(--p2); }
+  .set-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    line-height: 1.2;
+  }
+  .set-pips {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .pip {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 2px solid var(--muted);
+    transition: all .3s;
+  }
+  .pip.filled-p1 { background: var(--p1); border-color: var(--p1); }
+  .pip.filled-p2 { background: var(--p2); border-color: var(--p2); }
+
+  /* ── MAIN SCORE ── */
+  .score-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+  }
+  .score-panel {
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 8px;
+    position: relative;
+    transition: background .3s;
+  }
+  .score-panel.serve-active {
+    background: #1a1808;
+    box-shadow: inset 0 0 40px rgba(244,196,48,0.08);
+  }
+  .score-panel.p1 { }
+  .score-panel.p2 { }
+
+  .serve-indicator {
+    position: absolute;
+    top: 10px;
+    font-size: 1.2rem;
+    opacity: 0;
+    transition: opacity .3s;
+    filter: drop-shadow(0 0 6px var(--gold));
+  }
+  .serve-active .serve-indicator { opacity: 1; }
+
+  .score-number {
+    font-family: 'Bebas Neue', cursive;
+    font-size: clamp(5rem, 20vw, 9rem);
+    line-height: 1;
+    letter-spacing: -2px;
+    transition: transform .1s, color .2s;
+  }
+  .score-panel.p1 .score-number { color: var(--p1); }
+  .score-panel.p2 .score-number { color: var(--p2); }
+  .score-number.bump {
+    animation: bump .15s ease-out;
+  }
+  @keyframes bump {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.18); }
+    100% { transform: scale(1); }
+  }
+
+  .score-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* ── CONTROL BUTTONS ── */
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+  }
+  .score-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 14px 8px;
+    background: var(--surface2);
+    border: none;
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+    position: relative;
+    overflow: hidden;
+  }
+  .score-btn:active { transform: scale(0.97); }
+  .score-btn.add { background: var(--surface2); }
+  .score-btn.add:active { background: #252535; }
+  .score-btn.minus {
+    background: #0f0f18;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .score-btn .icon { font-size: 1.1rem; }
+
+  /* row 2: minus buttons */
+  .minus-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+  }
+
+  /* ── SERVE ROW ── */
+  .serve-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 10px 16px;
+    gap: 10px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .serve-btn {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    color: var(--muted);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+  }
+  .serve-btn.active-p1 {
+    background: rgba(230,57,70,0.15);
+    border-color: var(--p1);
+    color: var(--p1);
+    box-shadow: 0 0 12px rgba(230,57,70,0.2);
+  }
+  .serve-btn.active-p2 {
+    background: rgba(29,114,184,0.15);
+    border-color: var(--p2);
+    color: var(--p2);
+    box-shadow: 0 0 12px rgba(29,114,184,0.2);
+  }
+  .serve-center {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* ── ACTION ROW ── */
+  .action-row {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .action-btn {
+    flex: 1;
+    min-width: 80px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 9px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+  }
+  .action-btn:hover { border-color: var(--text); color: var(--text); }
+  .action-btn.danger { border-color: #c0392b33; color: #c0392b; }
+  .action-btn.danger:hover { background: rgba(192,57,43,0.1); border-color: #c0392b; }
+  .action-btn.primary { border-color: var(--gold); color: var(--gold); }
+  .action-btn.primary:hover { background: rgba(244,196,48,0.1); }
+
+  /* ── HISTORY PANEL ── */
+  .history-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .4s ease;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .history-panel.open { max-height: 300px; overflow-y: auto; }
+  .history-inner { padding: 12px 16px; }
+  .history-title {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .h-set { font-weight: 700; color: var(--gold); font-size: 0.75rem; width: 40px; }
+  .h-score { font-family: 'Oswald', sans-serif; font-size: 1rem; }
+  .h-p1 { color: var(--p1); }
+  .h-p2 { color: var(--p2); }
+  .h-winner { font-size: 0.7rem; color: var(--muted); margin-left: auto; }
+
+  /* ── WINNER OVERLAY ── */
+  .winner-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+    backdrop-filter: blur(8px);
+  }
+  .winner-overlay.show { display: flex; }
+  .winner-trophy { font-size: 4rem; animation: trophyPop 0.5s ease-out; }
+  @keyframes trophyPop {
+    0% { transform: scale(0) rotate(-20deg); opacity:0; }
+    60% { transform: scale(1.2) rotate(5deg); }
+    100% { transform: scale(1) rotate(0); opacity:1; }
+  }
+  .winner-name {
+    font-family: 'Bebas Neue', cursive;
+    font-size: clamp(2.5rem, 12vw, 5rem);
+    letter-spacing: 3px;
+    text-align: center;
+  }
+  .winner-name.p1 { color: var(--p1); text-shadow: 0 0 40px rgba(230,57,70,0.5); }
+  .winner-name.p2 { color: var(--p2); text-shadow: 0 0 40px rgba(29,114,184,0.5); }
+  .winner-sub { color: var(--muted); font-size: 0.9rem; letter-spacing: 2px; }
+  .winner-btn {
+    background: var(--gold);
+    color: #000;
+    border: none;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 14px 36px;
+    border-radius: 50px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+
+  /* ── SET END OVERLAY ── */
+  .setend-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 90;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+    backdrop-filter: blur(6px);
+  }
+  .setend-overlay.show { display: flex; }
+  .setend-title {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 2.8rem;
+    color: var(--gold);
+    letter-spacing: 3px;
+  }
+  .setend-score {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 3rem;
+  }
+  .setend-winner { font-size: 0.9rem; color: var(--muted); }
+  .setend-btn {
+    background: var(--gold);
+    color: #000;
+    border: none;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 13px 32px;
+    border-radius: 50px;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 0.82rem;
+    transition: transform .3s;
+    z-index: 200;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── MATCH FORMAT BADGE ── */
+  .format-badge {
+    font-size: 0.65rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 3px 8px;
+    border-radius: 12px;
+    letter-spacing: 1px;
+  }
+
+  /* ── DEUCE / MATCH POINT indicator ── */
+  .match-status {
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 6px;
+    background: transparent;
+    min-height: 28px;
+    transition: all .3s;
+  }
+  .match-status.deuce { color: var(--gold); background: rgba(244,196,48,0.08); }
+  .match-status.mp-p1 { color: var(--p1); background: rgba(230,57,70,0.08); }
+  .match-status.mp-p2 { color: var(--p2); background: rgba(29,114,184,0.08); }
+
+  /* Ripple */
+  .ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    transform: scale(0);
+    animation: rippleAnim .4s linear;
+    pointer-events: none;
+  }
+  @keyframes rippleAnim {
+    to { transform: scale(4); opacity: 0; }
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (min-width: 600px) {
+    .score-number { font-size: clamp(7rem, 18vw, 11rem); }
+    .score-btn { padding: 18px; font-size: 1rem; }
+    .topbar-title { font-size: 1.6rem; }
+  }
+  @media (min-width: 900px) {
+    body { max-width: 700px; margin: 0 auto; }
+    .score-number { font-size: 9rem; }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-title">🏓 탁구 스코어보드</div>
+  <div class="topbar-controls">
+    <span class="format-badge" id="formatBadge">5판 3선승</span>
+    <button class="format-btn active" id="btn5" onclick="setFormat(5)">5판</button>
+    <button class="format-btn" id="btn3" onclick="setFormat(3)">3판</button>
+    <div class="status-dot" id="statusDot" title="연결 상태"></div>
+  </div>
+</div>
+
+<!-- PLAYER NAMES -->
+<div class="names-row">
+  <div class="name-cell">
+    <input class="name-input" id="p1name" value="선수 1" maxlength="10"
+      oninput="saveNames()" placeholder="선수 1 이름">
+  </div>
+  <div class="name-cell">
+    <input class="name-input" id="p2name" value="선수 2" maxlength="10"
+      oninput="saveNames()" placeholder="선수 2 이름">
+  </div>
+</div>
+
+<!-- SET SCORES -->
+<div class="set-row">
+  <div style="text-align:center">
+    <div class="set-score p1" id="sets1">0</div>
+    <div class="set-pips" id="pips1"></div>
+  </div>
+  <div>
+    <div class="set-label">세트 수<br>획득</div>
+  </div>
+  <div style="text-align:center">
+    <div class="set-score p2" id="sets2">0</div>
+    <div class="set-pips" id="pips2"></div>
+  </div>
+</div>
+
+<!-- DEUCE / MATCH POINT STATUS -->
+<div class="match-status" id="matchStatus"></div>
+
+<!-- MAIN SCORE DISPLAY -->
+<div class="score-area">
+  <div class="score-panel p1" id="panel1">
+    <span class="serve-indicator" id="serveInd1">🏓</span>
+    <div class="score-number" id="score1">0</div>
+    <div class="score-label" id="label1">선수 1</div>
+  </div>
+  <div class="score-panel p2" id="panel2">
+    <span class="serve-indicator" id="serveInd2">🏓</span>
+    <div class="score-number" id="score2">0</div>
+    <div class="score-label" id="label2">선수 2</div>
+  </div>
+</div>
+
+<!-- +1 BUTTONS -->
+<div class="btn-row">
+  <button class="score-btn add" onclick="addScore(1)" id="addBtn1">
+    <span class="icon">＋</span> 득점
+  </button>
+  <button class="score-btn add" onclick="addScore(2)" id="addBtn2">
+    <span class="icon">＋</span> 득점
+  </button>
+</div>
+<!-- -1 BUTTONS -->
+<div class="minus-row">
+  <button class="score-btn minus" onclick="subtractScore(1)">－ 취소</button>
+  <button class="score-btn minus" onclick="subtractScore(2)">－ 취소</button>
+</div>
+
+<!-- SERVE SELECT -->
+<div class="serve-row">
+  <button class="serve-btn" id="serveBtn1" onclick="setServe(1)">🏓 서브</button>
+  <div class="serve-center">서브권</div>
+  <button class="serve-btn" id="serveBtn2" onclick="setServe(2)">서브 🏓</button>
+</div>
+
+<!-- ACTIONS -->
+<div class="action-row">
+  <button class="action-btn primary" onclick="toggleHistory()">📋 기록</button>
+  <button class="action-btn" onclick="nextSet()">다음 세트 ▶</button>
+  <button class="action-btn danger" onclick="resetGame()">↺ 초기화</button>
+</div>
+
+<!-- HISTORY -->
+<div class="history-panel" id="historyPanel">
+  <div class="history-inner">
+    <div class="history-title">경기 기록</div>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- SET END OVERLAY -->
+<div class="setend-overlay" id="setendOverlay">
+  <div class="setend-title" id="setendTitle">세트 종료</div>
+  <div class="setend-score">
+    <span class="h-p1" id="setendS1">0</span>
+    <span style="color:var(--muted)">:</span>
+    <span class="h-p2" id="setendS2">0</span>
+  </div>
+  <div class="setend-winner" id="setendWinner"></div>
+  <button class="setend-btn" onclick="confirmNextSet()">다음 세트 시작 →</button>
+</div>
+
+<!-- WINNER OVERLAY -->
+<div class="winner-overlay" id="winnerOverlay">
+  <div class="winner-trophy">🏆</div>
+  <div class="winner-name" id="winnerName">선수 1</div>
+  <div class="winner-sub" id="winnerSub">경기 종료</div>
+  <button class="winner-btn" onclick="resetGame()">새 경기 시작</button>
+</div>
+
+<script>
+// ─── FIREBASE CONFIG ───────────────────────────────────
+// ⚠️ 아래 firebaseConfig를 본인 Firebase 프로젝트 설정으로 교체하세요
+const firebaseConfig = {
+  apiKey: "AIzaSyCitGkZcA9rop79BtXJzTBFeez05EYhDoM",
+  authDomain: "reservation-928c2.firebaseapp.com",
+  databaseURL: "https://reservation-928c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "reservation-928c2",
+  storageBucket: "reservation-928c2.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "reservation-928c2"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const gameRef = db.ref('pingpong/game');
+const dot = document.getElementById('statusDot');
+db.ref('.info/connected').on('value', snap => {
+  dot.classList.toggle('online', snap.val() === true);
+});
+
+// ─── STATE ─────────────────────────────────────────────
+let state = {
+  score1: 0, score2: 0,
+  sets1: 0, sets2: 0,
+  serve: 1,
+  format: 5,        // 5판 or 3판
+  currentSet: 1,
+  history: [],      // [{set, s1, s2, winner}]
+  p1name: '선수 1',
+  p2name: '선수 2',
+  locked: false,
+};
+
+// ─── FIREBASE SYNC ─────────────────────────────────────
+function pushState() {
+  gameRef.set(state).catch(e => console.warn('Firebase write error:', e));
+}
+
+gameRef.on('value', snap => {
+  const data = snap.val();
+  if (!data) return;
+  state = data;
+  render();
+});
+
+// ─── RENDER ────────────────────────────────────────────
+function render() {
+  // Names
+  document.getElementById('p1name').value = state.p1name;
+  document.getElementById('p2name').value = state.p2name;
+  document.getElementById('label1').textContent = state.p1name;
+  document.getElementById('label2').textContent = state.p2name;
+
+  // Scores
+  document.getElementById('score1').textContent = state.score1;
+  document.getElementById('score2').textContent = state.score2;
+
+  // Sets
+  document.getElementById('sets1').textContent = state.sets1;
+  document.getElementById('sets2').textContent = state.sets2;
+
+  // Pips
+  const toWin = Math.ceil(state.format / 2);
+  renderPips('pips1', state.sets1, toWin, 'p1');
+  renderPips('pips2', state.sets2, toWin, 'p2');
+
+  // Format buttons
+  document.getElementById('btn5').classList.toggle('active', state.format === 5);
+  document.getElementById('btn3').classList.toggle('active', state.format === 3);
+  document.getElementById('formatBadge').textContent =
+    state.format === 5 ? '5판 3선승' : '3판 2선승';
+
+  // Serve
+  const s1 = document.getElementById('serveBtn1');
+  const s2 = document.getElementById('serveBtn2');
+  const p1 = document.getElementById('panel1');
+  const p2 = document.getElementById('panel2');
+  s1.className = 'serve-btn' + (state.serve === 1 ? ' active-p1' : '');
+  s2.className = 'serve-btn' + (state.serve === 2 ? ' active-p2' : '');
+  p1.classList.toggle('serve-active', state.serve === 1);
+  p2.classList.toggle('serve-active', state.serve === 2);
+  document.getElementById('serveInd1').style.opacity = state.serve === 1 ? '1' : '0';
+  document.getElementById('serveInd2').style.opacity = state.serve === 2 ? '1' : '0';
+
+  // Match status
+  updateMatchStatus();
+
+  // History
+  renderHistory();
+}
+
+function renderPips(id, filled, total, cls) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    const pip = document.createElement('div');
+    pip.className = 'pip' + (i < filled ? ' filled-' + cls : '');
+    el.appendChild(pip);
+  }
+}
+
+function updateMatchStatus() {
+  const el = document.getElementById('matchStatus');
+  const s1 = state.score1, s2 = state.score2;
+  const toWin = Math.ceil(state.format / 2);
+  // check deuce
+  if (s1 >= 10 && s2 >= 10) {
+    const diff = Math.abs(s1 - s2);
+    if (diff === 0) {
+      el.textContent = 'DEUCE'; el.className = 'match-status deuce'; return;
+    }
+    if (diff === 1) {
+      const lead = s1 > s2 ? 1 : 2;
+      el.textContent = 'ADVANTAGE — ' + (lead === 1 ? state.p1name : state.p2name);
+      el.className = 'match-status ' + (lead === 1 ? 'mp-p1' : 'mp-p2'); return;
+    }
+  }
+  // match point
+  const sets1 = state.sets1, sets2 = state.sets2;
+  const mpCheck = (playerSets, oppSets, pScore, oppScore, pName, cls) => {
+    if (playerSets === toWin - 1) {
+      // needs this set
+      if (pScore >= 10 && pScore > oppScore) {
+        el.textContent = 'MATCH POINT — ' + pName;
+        el.className = 'match-status ' + cls; return true;
+      }
+    }
+    return false;
+  };
+  if (!mpCheck(sets1, sets2, s1, s2, state.p1name, 'mp-p1'))
+    if (!mpCheck(sets2, sets1, s2, s1, state.p2name, 'mp-p2')) {
+      // set point
+      if (s1 >= 10 && s1 > s2 && s1 >= s2 + 1) {
+        el.textContent = 'SET POINT — ' + state.p1name;
+        el.className = 'match-status mp-p1'; return;
+      }
+      if (s2 >= 10 && s2 > s1 && s2 >= s1 + 1) {
+        el.textContent = 'SET POINT — ' + state.p2name;
+        el.className = 'match-status mp-p2'; return;
+      }
+      el.textContent = ''; el.className = 'match-status';
+    }
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (!state.history || state.history.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;padding:8px 0">경기 기록이 없습니다</div>';
+    return;
+  }
+  list.innerHTML = state.history.map(h => `
+    <div class="history-item">
+      <span class="h-set">SET ${h.set}</span>
+      <span class="h-score h-p1">${h.s1}</span>
+      <span style="color:var(--muted)">:</span>
+      <span class="h-score h-p2">${h.s2}</span>
+      <span class="h-winner">🏆 ${h.winner}</span>
+    </div>
+  `).join('');
+}
+
+// ─── GAME LOGIC ────────────────────────────────────────
+function addScore(player) {
+  if (state.locked) return;
+  if (player === 1) state.score1++;
+  else state.score2++;
+
+  // bump animation
+  bumpScore(player);
+
+  // auto serve switch (every 2 points, deuce: every point)
+  autoServe();
+
+  // check set win
+  checkSetWin();
+
+  pushState();
+}
+
+function subtractScore(player) {
+  if (state.locked) return;
+  if (player === 1 && state.score1 > 0) state.score1--;
+  else if (player === 2 && state.score2 > 0) state.score2--;
+  pushState();
+}
+
+function autoServe() {
+  const total = state.score1 + state.score2;
+  const isDeuce = state.score1 >= 10 && state.score2 >= 10;
+  if (isDeuce) {
+    // switch every point
+    state.serve = (total % 2 === 0) ? getSetStartServer() : (getSetStartServer() === 1 ? 2 : 1);
+  } else {
+    // switch every 2 points
+    const block = Math.floor(total / 2);
+    state.serve = (block % 2 === 0) ? getSetStartServer() : (getSetStartServer() === 1 ? 2 : 1);
+  }
+}
+
+function getSetStartServer() {
+  // Sets alternate starting server; set 1 starts with serve=1
+  return ((state.currentSet - 1) % 2 === 0) ? 1 : 2;
+}
+
+function checkSetWin() {
+  const s1 = state.score1, s2 = state.score2;
+  const toWin = Math.ceil(state.format / 2);
+  // win condition: 11 points, 2 ahead
+  const p1wins = s1 >= 11 && s1 - s2 >= 2;
+  const p2wins = s2 >= 11 && s2 - s1 >= 2;
+  if (!p1wins && !p2wins) return;
+
+  const winner = p1wins ? 1 : 2;
+  if (winner === 1) state.sets1++;
+  else state.sets2++;
+
+  // record history
+  if (!state.history) state.history = [];
+  state.history.push({
+    set: state.currentSet,
+    s1: state.score1,
+    s2: state.score2,
+    winner: winner === 1 ? state.p1name : state.p2name
+  });
+
+  // check match win
+  if (state.sets1 >= toWin || state.sets2 >= toWin) {
+    state.locked = true;
+    pushState();
+    showWinner(winner);
+    return;
+  }
+
+  // show set end overlay
+  pushState();
+  showSetEnd(winner, state.score1, state.score2);
+}
+
+function showSetEnd(winner, s1, s2) {
+  document.getElementById('setendTitle').textContent = `SET ${state.currentSet} 종료`;
+  document.getElementById('setendS1').textContent = s1;
+  document.getElementById('setendS2').textContent = s2;
+  const wName = winner === 1 ? state.p1name : state.p2name;
+  const wColor = winner === 1 ? 'var(--p1)' : 'var(--p2)';
+  document.getElementById('setendWinner').innerHTML =
+    `<span style="color:${wColor};font-weight:700">${wName}</span> 세트 획득`;
+  document.getElementById('setendOverlay').classList.add('show');
+}
+
+function confirmNextSet() {
+  document.getElementById('setendOverlay').classList.remove('show');
+  doNextSet();
+}
+
+function nextSet() {
+  if (state.locked) return;
+  if (state.score1 > 0 || state.score2 > 0) {
+    showSetEnd(state.score1 > state.score2 ? 1 : 2, state.score1, state.score2);
+  }
+}
+
+function doNextSet() {
+  state.currentSet++;
+  // sides swap on even sets
+  state.score1 = 0;
+  state.score2 = 0;
+  state.serve = getSetStartServer();
+  pushState();
+  showToast(`SET ${state.currentSet} 시작 — 서브: ${state.serve === 1 ? state.p1name : state.p2name}`);
+}
+
+function showWinner(player) {
+  const name = player === 1 ? state.p1name : state.p2name;
+  const cls = player === 1 ? 'p1' : 'p2';
+  const toWin = Math.ceil(state.format / 2);
+  document.getElementById('winnerName').textContent = name;
+  document.getElementById('winnerName').className = 'winner-name ' + cls;
+  document.getElementById('winnerSub').textContent =
+    `${state.sets1} : ${state.sets2} 로 경기 종료 🏆`;
+  document.getElementById('winnerOverlay').classList.add('show');
+}
+
+function setServe(player) {
+  state.serve = player;
+  pushState();
+}
+
+function setFormat(n) {
+  state.format = n;
+  pushState();
+}
+
+function saveNames() {
+  state.p1name = document.getElementById('p1name').value || '선수 1';
+  state.p2name = document.getElementById('p2name').value || '선수 2';
+  pushState();
+}
+
+function resetGame() {
+  document.getElementById('winnerOverlay').classList.remove('show');
+  document.getElementById('setendOverlay').classList.remove('show');
+  state = {
+    score1: 0, score2: 0,
+    sets1: 0, sets2: 0,
+    serve: 1,
+    format: state.format,
+    currentSet: 1,
+    history: [],
+    p1name: state.p1name,
+    p2name: state.p2name,
+    locked: false,
+  };
+  pushState();
+  showToast('새 경기를 시작합니다 🏓');
+}
+
+function toggleHistory() {
+  const panel = document.getElementById('historyPanel');
+  panel.classList.toggle('open');
+}
+
+// ─── UI HELPERS ────────────────────────────────────────
+function bumpScore(player) {
+  const el = document.getElementById('score' + player);
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Ripple effect
+document.querySelectorAll('.score-btn').forEach(btn => {
+  btn.addEventListener('pointerdown', e => {
+    const r = document.createElement('span');
+    r.className = 'ripple';
+    const rect = btn.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    r.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px`;
+    btn.appendChild(r);
+    setTimeout(() => r.remove(), 500);
+  });
+});
+
+// ─── INIT ──────────────────────────────────────────────
+// If Firebase not configured, start with local state
+setTimeout(() => {
+  if (!dot.classList.contains('online')) {
+    showToast('⚠️ Firebase 설정을 완료해주세요');
+    render(); // render local
+  }
+}, 3000);
+
+render();
+</script>
+</body>
+</html>
