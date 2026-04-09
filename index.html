@@ -854,14 +854,49 @@ document.addEventListener('keyup',e=>{
   }
 });
 
+// ── 블루투스 링 키 전체 매핑 ──────────────────────────
+// keydown: 볼륨키 + 미디어키 + 방향키 + 기타 모든 후보
+const RING_KEYS = new Set([
+  // 볼륨
+  'AudioVolumeUp','AudioVolumeDown','VolumeUp','VolumeDown',
+  // 미디어
+  'MediaTrackNext','MediaTrackPrevious','MediaPlayPause','MediaPlay','MediaPause','MediaStop',
+  'MediaFastForward','MediaRewind','MediaRecord','MediaSelect',
+  // 방향키 (일부 링이 Arrow로 전송)
+  'ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
+  // 엔터/스페이스 (일부 링)
+  'Enter',' ','Tab',
+  // F키
+  'F1','F2','F3','F4','F5','F6','F7','F8',
+  // 기타
+  'Home','End','Insert','Escape',
+  'BrowserBack','BrowserForward','BrowserSearch',
+  'LaunchApplication1','LaunchApplication2','LaunchMail',
+  'ChannelUp','ChannelDown',
+  'ZoomIn','ZoomOut',
+  'Info','ClosedCaptionToggle','Exit',
+  'GoHome','GoBack',
+]);
+
+document.addEventListener('keydown', e => {
+  if(document.getElementById('lockScreen').style.display === 'none' ? false : true) return;
+  if(document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  if(RING_KEYS.has(e.key) && !e.repeat){
+    e.preventDefault();
+    if(!state.locked) addSide('R');
+  }
+}, true); // capture:true — 브라우저 기본 처리 전에 가로채기
+
 // ── 블루투스 링 MediaSession fallback ─────────────────
-// 브라우저가 볼륨키 keydown을 차단할 경우 MediaSession으로 감지
 function setupRingMediaSession(){
   if(!('mediaSession' in navigator))return;
   const handler=()=>{ if(!state.locked)addSide('R'); };
-  ['nexttrack','previoustrack','play','pause'].forEach(a=>{
-    try{ navigator.mediaSession.setActionHandler(a,handler); }catch(e){}
-  });
+  [
+    'play','pause','stop',
+    'nexttrack','previoustrack',
+    'seekforward','seekbackward',
+    'skipad','togglemicrophone','togglecamera','hangup',
+  ].forEach(a=>{ try{ navigator.mediaSession.setActionHandler(a,handler); }catch(e){} });
 }
 // 첫 터치/클릭 시 AudioContext 활성화 → MediaSession 등록
 (function(){
