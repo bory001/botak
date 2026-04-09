@@ -812,9 +812,10 @@ function cancelPwChange(){
 }
 
 // ── 키보드 단축키 ──────────────────────────────────────
-// PageUp   단타: 왼쪽 +1  /  길게(600ms): 왼쪽 -1
-// PageDown 단타: 오른쪽 +1 / 길게(600ms): 오른쪽 -1
-// 5        단타: 오른쪽 +1
+// PageUp      단타: 왼쪽 +1  /  길게(600ms): 왼쪽 -1
+// PageDown    단타: 오른쪽 +1 / 길게(600ms): 오른쪽 -1
+// VolumeUp    오른쪽 +1  (블루투스 링)
+// VolumeDown  오른쪽 +1  (블루투스 링)
 const KEY_LONG=600;
 const kTimer={PageUp:null,PageDown:null};
 const kFired={PageUp:false,PageDown:false};
@@ -830,10 +831,12 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();kFired.PageDown=false;
     kTimer.PageDown=setTimeout(()=>{kFired.PageDown=true;kTimer.PageDown=null;if(!state.locked)subtractSide('R');},KEY_LONG);
   }
-  // 숫자 5: 오른쪽 +1
-  if((e.key==='5'||e.code==='Digit5'||e.code==='Numpad5')&&!e.repeat){
-    e.preventDefault();
-    if(!state.locked)addSide('R');
+  // 블루투스 링: 볼륨키 → 오른쪽 +1
+  if((e.key==='AudioVolumeUp'||e.key==='VolumeUp'||e.code==='AudioVolumeUp')&&!e.repeat){
+    e.preventDefault();if(!state.locked)addSide('R');
+  }
+  if((e.key==='AudioVolumeDown'||e.key==='VolumeDown'||e.code==='AudioVolumeDown')&&!e.repeat){
+    e.preventDefault();if(!state.locked)addSide('R');
   }
 });
 document.addEventListener('keyup',e=>{
@@ -850,6 +853,32 @@ document.addEventListener('keyup',e=>{
     kFired.PageDown=false;
   }
 });
+
+// ── 블루투스 링 MediaSession fallback ─────────────────
+// 브라우저가 볼륨키 keydown을 차단할 경우 MediaSession으로 감지
+function setupRingMediaSession(){
+  if(!('mediaSession' in navigator))return;
+  const handler=()=>{ if(!state.locked)addSide('R'); };
+  ['nexttrack','previoustrack','play','pause'].forEach(a=>{
+    try{ navigator.mediaSession.setActionHandler(a,handler); }catch(e){}
+  });
+}
+// 첫 터치/클릭 시 AudioContext 활성화 → MediaSession 등록
+(function(){
+  let activated=false;
+  function activate(){
+    if(activated)return; activated=true;
+    try{
+      const ctx=new(window.AudioContext||window.webkitAudioContext)();
+      const buf=ctx.createBuffer(1,1,22050);
+      const src=ctx.createBufferSource();
+      src.buffer=buf;src.connect(ctx.destination);src.start();
+    }catch(e){}
+    setupRingMediaSession();
+  }
+  document.addEventListener('click',activate,{once:true});
+  document.addEventListener('touchstart',activate,{once:true,passive:true});
+})();
 
 // ── SERVICE WORKER ────────────────────────────────────
 if('serviceWorker' in navigator){
