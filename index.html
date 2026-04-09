@@ -832,11 +832,11 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();kFired.PageDown=false;
     kTimer.PageDown=setTimeout(()=>{kFired.PageDown=true;kTimer.PageDown=null;if(!state.locked)subtractSide('R');},KEY_LONG);
   }
-  // 블루투스 링: 볼륨키 → 오른쪽 +1
-  if((e.key==='AudioVolumeUp'||e.key==='VolumeUp'||e.code==='AudioVolumeUp')&&!e.repeat){
+  // 블루투스 링: 볼륨키 → 오른쪽 +1 (D02 Consumer Control 장치 포함)
+  if((e.key==='AudioVolumeUp'||e.key==='VolumeUp'||e.code==='AudioVolumeUp'||e.keyCode===175||e.which===175)&&!e.repeat){
     e.preventDefault();if(!state.locked)addSide('R');
   }
-  if((e.key==='AudioVolumeDown'||e.key==='VolumeDown'||e.code==='AudioVolumeDown')&&!e.repeat){
+  if((e.key==='AudioVolumeDown'||e.key==='VolumeDown'||e.code==='AudioVolumeDown'||e.keyCode===174||e.which===174)&&!e.repeat){
     e.preventDefault();if(!state.locked)addSide('R');
   }
 });
@@ -856,37 +856,61 @@ document.addEventListener('keyup',e=>{
 });
 
 // ── 블루투스 링 키 전체 매핑 ──────────────────────────
-// keydown: 볼륨키 + 미디어키 + 방향키 + 기타 모든 후보
 const RING_KEYS = new Set([
-  // 볼륨
   'AudioVolumeUp','AudioVolumeDown','VolumeUp','VolumeDown',
-  // 미디어
   'MediaTrackNext','MediaTrackPrevious','MediaPlayPause','MediaPlay','MediaPause','MediaStop',
   'MediaFastForward','MediaRewind','MediaRecord','MediaSelect',
-  // 방향키 (일부 링이 Arrow로 전송)
   'ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
-  // 엔터/스페이스 (일부 링)
   'Enter',' ','Tab',
-  // F키
   'F1','F2','F3','F4','F5','F6','F7','F8',
-  // 기타
   'Home','End','Insert','Escape',
   'BrowserBack','BrowserForward','BrowserSearch',
   'LaunchApplication1','LaunchApplication2','LaunchMail',
-  'ChannelUp','ChannelDown',
-  'ZoomIn','ZoomOut',
-  'Info','ClosedCaptionToggle','Exit',
-  'GoHome','GoBack',
+  'ChannelUp','ChannelDown','ZoomIn','ZoomOut',
+  'Info','ClosedCaptionToggle','Exit','GoHome','GoBack',
 ]);
+// keyCode 숫자로도 감지 (Consumer Control 장치)
+const RING_KEYCODES = new Set([174,175,176,177,178,179,180,181,182,183]);
 
 document.addEventListener('keydown', e => {
   if(document.getElementById('lockScreen').style.display === 'none' ? false : true) return;
   if(document.activeElement && document.activeElement.tagName === 'INPUT') return;
-  if(RING_KEYS.has(e.key) && !e.repeat){
+  if((RING_KEYS.has(e.key) || RING_KEYCODES.has(e.keyCode)) && !e.repeat){
     e.preventDefault();
     if(!state.locked) addSide('R');
   }
-}, true); // capture:true — 브라우저 기본 처리 전에 가로채기
+}, true);
+
+// ── Gamepad API: 링이 게임패드로 잡힐 경우 ────────────
+(function(){
+  const gpState={};
+  function pollGamepad(){
+    const pads=navigator.getGamepads?navigator.getGamepads():[];
+    for(const gp of pads){
+      if(!gp)continue;
+      if(!gpState[gp.index]) gpState[gp.index]={buttons:[]};
+      gp.buttons.forEach((btn,i)=>{
+        const wasPressed=gpState[gp.index].buttons[i]||false;
+        const isPressed=btn.pressed||btn.value>0.5;
+        if(isPressed&&!wasPressed){
+          if(!state.locked) addSide('R');
+        }
+        gpState[gp.index].buttons[i]=isPressed;
+      });
+      // 축(Axis) 변화 감지 (D-Pad가 축으로 들어오는 경우)
+      if(!gpState[gp.index].axes) gpState[gp.index].axes=[];
+      gp.axes.forEach((val,i)=>{
+        const prev=gpState[gp.index].axes[i]||0;
+        if(Math.abs(val)>0.5 && Math.abs(prev)<=0.5){
+          if(!state.locked) addSide('R');
+        }
+        gpState[gp.index].axes[i]=val;
+      });
+    }
+    requestAnimationFrame(pollGamepad);
+  }
+  window.addEventListener('gamepadconnected', ()=>{ pollGamepad(); });
+})();
 
 // ── 블루투스 링 MediaSession fallback ─────────────────
 function setupRingMediaSession(){
