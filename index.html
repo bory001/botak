@@ -814,6 +814,7 @@ function cancelPwChange(){
 // ── 키보드 단축키 ──────────────────────────────────────
 // PageUp   단타: 왼쪽 +1  /  길게(600ms): 왼쪽 -1
 // PageDown 단타: 오른쪽 +1 / 길게(600ms): 오른쪽 -1
+// 5        단타: 오른쪽 +1
 const KEY_LONG=600;
 const kTimer={PageUp:null,PageDown:null};
 const kFired={PageUp:false,PageDown:false};
@@ -828,6 +829,11 @@ document.addEventListener('keydown',e=>{
   if(e.key==='PageDown'&&!e.repeat){
     e.preventDefault();kFired.PageDown=false;
     kTimer.PageDown=setTimeout(()=>{kFired.PageDown=true;kTimer.PageDown=null;if(!state.locked)subtractSide('R');},KEY_LONG);
+  }
+  // 숫자 5: 오른쪽 +1
+  if((e.key==='5'||e.code==='Digit5'||e.code==='Numpad5')&&!e.repeat){
+    e.preventDefault();
+    if(!state.locked)addSide('R');
   }
 });
 document.addEventListener('keyup',e=>{
