@@ -524,6 +524,7 @@ function switchMatch(id) {
   fbListener = gameRef.on('value', snap => {
     state = snap.val() || mkState();
     render();
+    wakeOnSync();
   });
   document.getElementById('matchSelect').value = id;
 }
@@ -915,6 +916,28 @@ function setupRingMediaSession(){
   document.addEventListener('touchstart',activate,{once:true,passive:true});
 })();
 
+// ── WAKE LOCK ─────────────────────────────────────────
+// Firebase로 점수 변경 시 화면이 꺼지지 않도록 Wake Lock 유지
+let wakeLock = null;
+async function requestWakeLock(){
+  if(!('wakeLock' in navigator))return;
+  try{
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release',()=>{ wakeLock=null; });
+  }catch(e){}
+}
+async function reacquireWakeLock(){
+  if(wakeLock===null) await requestWakeLock();
+}
+// 페이지 visible 복귀 시 재획득
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible') reacquireWakeLock();
+});
+// Firebase 데이터 수신 시마다 Wake Lock 갱신 (화면 절전 리셋)
+function wakeOnSync(){
+  reacquireWakeLock();
+}
+
 // ── SERVICE WORKER ────────────────────────────────────
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
@@ -929,6 +952,7 @@ if('serviceWorker' in navigator){
 });
 initPanels();
 switchMatch('match01');
+requestWakeLock();
 setTimeout(()=>{if(!connDot.classList.contains('online'))showToast('⚠️ Firebase 연결 확인');},3000);
 </script>
 </body>
